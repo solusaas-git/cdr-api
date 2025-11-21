@@ -60,8 +60,17 @@ fastify.get('/', async (request, reply) => {
 // Health check endpoint with database connectivity test
 fastify.get('/health', async (request, reply) => {
   try {
-    // Test database connection
-    await query('SELECT 1');
+    console.log('🏥 Health check requested');
+    
+    // Test database connection with timeout
+    const dbTestPromise = query('SELECT 1 as test');
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database query timeout after 5s')), 5000)
+    );
+    
+    await Promise.race([dbTestPromise, timeoutPromise]);
+    
+    console.log('✅ Health check passed');
     
     return {
       status: 'ok',
@@ -70,12 +79,15 @@ fastify.get('/health', async (request, reply) => {
       environment: IS_VERCEL ? 'vercel' : 'local',
     };
   } catch (error) {
+    console.error('❌ Health check failed:', error);
+    
     return reply.code(503).send({
       status: 'unhealthy',
       database: 'disconnected',
       timestamp: new Date().toISOString(),
       environment: IS_VERCEL ? 'vercel' : 'local',
       error: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
     });
   }
 });

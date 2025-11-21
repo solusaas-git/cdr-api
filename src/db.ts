@@ -42,21 +42,27 @@ export async function query<T = any>(
 ): Promise<T[]> {
   const start = Date.now();
   
-  // Log query start with truncated SQL for debugging
-  const truncatedSql = text.replace(/\s+/g, ' ').substring(0, 100);
-  console.log(`🔍 Executing query: ${truncatedSql}${text.length > 100 ? '...' : ''}`);
-  
-  const res = await pool.query(text, params);
-  const duration = Date.now() - start;
-  
-  console.log(`⚡ Query executed in ${duration}ms - returned ${res.rows.length} rows`);
-  
-  // Warn about slow queries
-  if (duration > 5000) {
-    console.warn(`⚠️  SLOW QUERY DETECTED: ${duration}ms`);
+  try {
+    // Log query start with truncated SQL for debugging
+    const truncatedSql = text.replace(/\s+/g, ' ').substring(0, 100);
+    console.log(`🔍 Executing query: ${truncatedSql}${text.length > 100 ? '...' : ''}`);
+    
+    const res = await pool.query(text, params);
+    const duration = Date.now() - start;
+    
+    console.log(`⚡ Query executed in ${duration}ms - returned ${res.rows.length} rows`);
+    
+    // Warn about slow queries
+    if (duration > 5000) {
+      console.warn(`⚠️  SLOW QUERY DETECTED: ${duration}ms`);
+    }
+    
+    return res.rows;
+  } catch (error) {
+    const duration = Date.now() - start;
+    console.error(`❌ Query failed after ${duration}ms:`, error);
+    throw error;
   }
-  
-  return res.rows;
 }
 
 // Helper function for transactions
