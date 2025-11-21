@@ -43,21 +43,21 @@ export async function query<T = any>(
   const start = Date.now();
   
   try {
-    // Log query start with truncated SQL for debugging
-    const truncatedSql = text.replace(/\s+/g, ' ').substring(0, 100);
-    console.log(`🔍 Executing query: ${truncatedSql}${text.length > 100 ? '...' : ''}`);
-    
-    const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    
-    console.log(`⚡ Query executed in ${duration}ms - returned ${res.rows.length} rows`);
-    
-    // Warn about slow queries
-    if (duration > 5000) {
-      console.warn(`⚠️  SLOW QUERY DETECTED: ${duration}ms`);
-    }
-    
-    return res.rows;
+  // Log query start with truncated SQL for debugging
+  const truncatedSql = text.replace(/\s+/g, ' ').substring(0, 100);
+  console.log(`🔍 Executing query: ${truncatedSql}${text.length > 100 ? '...' : ''}`);
+  
+  const res = await pool.query(text, params);
+  const duration = Date.now() - start;
+  
+  console.log(`⚡ Query executed in ${duration}ms - returned ${res.rows.length} rows`);
+  
+  // Warn about slow queries
+  if (duration > 5000) {
+    console.warn(`⚠️  SLOW QUERY DETECTED: ${duration}ms`);
+  }
+  
+  return res.rows;
   } catch (error) {
     const duration = Date.now() - start;
     console.error(`❌ Query failed after ${duration}ms:`, error);

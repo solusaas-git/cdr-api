@@ -7,7 +7,7 @@ A high-performance API server for querying CDR (Call Detail Records) from a Post
 - ⚡ **Fast**: Built with Fastify for maximum performance
 - 🔄 **Streaming Replication**: Reads from PostgreSQL replica (no load on production)
 - 📊 **Batch Processing**: Handles large datasets efficiently
-- 🔒 **Secure**: CORS protection and authentication ready
+- 🔒 **Secure**: Bearer token authentication, CORS protection
 - 📈 **Scalable**: Connection pooling and optimized queries
 
 ## Prerequisites
@@ -48,7 +48,13 @@ API_HOST=0.0.0.0
 
 # CORS
 ALLOWED_ORIGINS=http://localhost:3000,https://your-domain.com
+
+# Authentication (REQUIRED for production)
+# Generate with: openssl rand -base64 32
+API_SECRET=your-secure-api-secret-here
 ```
+
+**⚠️ IMPORTANT:** The `API_SECRET` must match the `CDR_API_SECRET` in your Next.js application.
 
 ## Development
 
@@ -69,9 +75,14 @@ npm start
 
 ## API Endpoints
 
+**🔐 Authentication Required:** All endpoints (except `/health`) require a Bearer token in the Authorization header.
+
 ### GET /cdrs
 
 Fetch CDRs with filters.
+
+**Headers:**
+- `Authorization: Bearer <API_SECRET>` (required)
 
 **Query Parameters:**
 - `i_account` (required): Account ID
@@ -85,12 +96,16 @@ Fetch CDRs with filters.
 
 **Example:**
 ```bash
-curl "http://localhost:3001/cdrs?i_account=14&limit=1000&offset=0&type=non_zero_and_errors"
+curl "http://localhost:3001/cdrs?i_account=14&limit=1000&offset=0&type=non_zero_and_errors" \
+  -H "Authorization: Bearer your-api-secret-here"
 ```
 
 ### GET /cdrs/stats
 
 Get aggregated CDR statistics (faster than fetching all records).
+
+**Headers:**
+- `Authorization: Bearer <API_SECRET>` (required)
 
 **Query Parameters:**
 - `i_account` (required): Account ID
@@ -99,7 +114,8 @@ Get aggregated CDR statistics (faster than fetching all records).
 
 **Example:**
 ```bash
-curl "http://localhost:3001/cdrs/stats?i_account=14"
+curl "http://localhost:3001/cdrs/stats?i_account=14" \
+  -H "Authorization: Bearer your-api-secret-here"
 ```
 
 ### GET /health
@@ -182,10 +198,42 @@ sudo journalctl -u cdr-api -f
 
 ## Security
 
+### Authentication
+
+All API endpoints (except `/health`) are protected with Bearer token authentication.
+
+**Setup:**
+
+1. Generate a secure API secret:
+   ```bash
+   openssl rand -base64 32
+   ```
+
+2. Set the secret in CDR API `.env`:
+   ```env
+   API_SECRET=your-generated-secret
+   ```
+
+3. Set the same secret in your Next.js app `.env`:
+   ```env
+   CDR_API_SECRET=your-generated-secret
+   ```
+
+4. Test authentication:
+   ```bash
+   ./test-auth.sh
+   ```
+
+**See also:**
+- [SECURITY_FIX.md](./SECURITY_FIX.md) - Details about the security implementation
+- [AUTHENTICATION_IMPLEMENTATION.md](./AUTHENTICATION_IMPLEMENTATION.md) - Complete authentication guide
+
+### Additional Security Measures
+
 1. **Firewall**: Only allow connections from your Next.js server
-2. **Authentication**: Add JWT or API key authentication (see middleware examples)
-3. **Rate Limiting**: Implement rate limiting for production use
-4. **SSL/TLS**: Use HTTPS in production (reverse proxy with Nginx)
+2. **Rate Limiting**: Consider implementing rate limiting for production use
+3. **SSL/TLS**: Use HTTPS in production (reverse proxy with Nginx)
+4. **IP Whitelisting**: Restrict access to known IP addresses
 
 ## Troubleshooting
 

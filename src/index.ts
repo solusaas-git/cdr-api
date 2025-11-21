@@ -48,12 +48,6 @@ fastify.get('/', async (request, reply) => {
     version: '1.0.0',
     status: 'running',
     environment: IS_VERCEL ? 'vercel' : 'local',
-    endpoints: {
-      cdrs: 'GET /cdrs',
-      consumption: 'GET /consumption',
-      stats: 'GET /cdrs/stats',
-      health: 'GET /health',
-    },
   };
 });
 

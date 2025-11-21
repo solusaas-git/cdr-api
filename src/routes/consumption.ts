@@ -1,5 +1,6 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { query } from '../db';
+import { authenticateRequest } from '../middleware/auth';
 
 interface ConsumptionQuerystring {
   i_account?: string;
@@ -19,6 +20,9 @@ export async function consumptionRoutes(fastify: FastifyInstance) {
   // Only returns: cost, duration, result, connect_time
   fastify.get<{ Querystring: ConsumptionQuerystring }>(
     '/consumption',
+    {
+      preHandler: authenticateRequest,
+    },
     async (request: FastifyRequest<{ Querystring: ConsumptionQuerystring }>, reply: FastifyReply) => {
       const startTime = Date.now();
 

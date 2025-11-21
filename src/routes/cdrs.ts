@@ -1,6 +1,7 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { query } from '../db';
 import { CDRQueryParams, CDRResponse, CDRRecord } from '../types';
+import { authenticateRequest } from '../middleware/auth';
 
 interface CDRQuerystring {
   i_account?: string; // Optional - if not provided, query all accounts
@@ -20,6 +21,9 @@ export async function cdrRoutes(fastify: FastifyInstance) {
   // GET /cdrs - Fetch CDRs with filters
   fastify.get<{ Querystring: CDRQuerystring }>(
     '/cdrs',
+    {
+      preHandler: authenticateRequest,
+    },
     async (request: FastifyRequest<{ Querystring: CDRQuerystring }>, reply: FastifyReply) => {
       const startTime = Date.now();
       const timings: Record<string, number> = {};
@@ -229,6 +233,9 @@ export async function cdrRoutes(fastify: FastifyInstance) {
   // GET /cdrs/stats - Get CDR statistics (faster than fetching all records)
   fastify.get<{ Querystring: CDRQuerystring }>(
     '/cdrs/stats',
+    {
+      preHandler: authenticateRequest,
+    },
     async (request: FastifyRequest<{ Querystring: CDRQuerystring }>, reply: FastifyReply) => {
       try {
         const { i_account, start_date, end_date } = request.query;
@@ -288,6 +295,9 @@ export async function cdrRoutes(fastify: FastifyInstance) {
   // GET /cdrs/top-destinations - Get top destinations by call count and cost
   fastify.get<{ Querystring: CDRQuerystring }>(
     '/cdrs/top-destinations',
+    {
+      preHandler: authenticateRequest,
+    },
     async (request: FastifyRequest<{ Querystring: CDRQuerystring }>, reply: FastifyReply) => {
       try {
         const { i_account, start_date, end_date, limit = '20' } = request.query;
@@ -358,7 +368,9 @@ export async function cdrRoutes(fastify: FastifyInstance) {
   );
 
   // Replication status endpoint
-  fastify.get('/replication-status', async (request, reply) => {
+  fastify.get('/replication-status', {
+    preHandler: authenticateRequest,
+  }, async (request, reply) => {
     try {
       const result = await query(`
         SELECT 
