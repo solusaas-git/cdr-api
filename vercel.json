@@ -1,26 +1,20 @@
 {
   "version": 2,
   "name": "cdr-api",
-  "builds": [
+  "rewrites": [
     {
-      "src": "src/index.ts",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "src/index.ts"
+      "source": "/(.*)",
+      "destination": "/api"
     }
   ],
   "functions": {
-    "src/index.ts": {
-      "maxDuration": 300
+    "api/*.ts": {
+      "maxDuration": 300,
+      "memory": 1024
     }
   },
   "env": {
     "NODE_ENV": "production"
-  },
-  "regions": ["iad1"]
+  }
 }
 
