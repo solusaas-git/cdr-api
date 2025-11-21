@@ -1,0 +1,36 @@
+{
+  "name": "cdr-api",
+  "version": "1.0.0",
+  "description": "High-performance CDR API with PostgreSQL replica",
+  "main": "dist/index.js",
+  "scripts": {
+    "predev": "lsof -ti:3002 | xargs kill -9 2>/dev/null || true",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "vercel-build": "echo 'No build step needed for serverless'",
+    "type-check": "tsc --noEmit",
+    "create-indexes": "tsx add-cdr-indexes.ts",
+    "verify-indexes": "tsx verify-indexes.ts"
+  },
+  "keywords": [
+    "cdr",
+    "api",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fastify/cors": "^9.0.1",
+    "dotenv": "^16.4.5",
+    "fastify": "^4.26.2",
+    "pg": "^8.11.3",
+    "pino-pretty": "^13.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/pg": "^8.11.4",
+    "tsx": "^4.7.1",
+    "typescript": "^5.4.3"
+  }
+}
