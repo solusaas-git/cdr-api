@@ -82,6 +82,8 @@ export async function consumptionRoutes(fastify: FastifyInstance) {
 
         console.log(`📊 Fetching consumption data for account ${accountId}`);
         console.log(`📅 Date range: ${start_date || 'all'} to ${end_date || 'all'}`);
+        console.log(`🔍 SQL Query:`, sql.replace(/\n\s+/g, ' '));
+        console.log(`🔍 SQL Params:`, params);
 
         // Execute aggregation query with safeQuery
         const queryStart = Date.now();
