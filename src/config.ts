@@ -24,8 +24,8 @@ export const config = {
 
   // Server configuration
   server: {
-    port: parseInt(process.env.API_PORT || '3001', 10),
-    host: process.env.API_HOST || 'localhost',
+    port: parseInt(process.env.API_PORT || '3002', 10),
+    host: process.env.API_HOST || '0.0.0.0',
     requestTimeout: 600000, // 10 minutes
     bodyLimit: 10485760, // 10MB
   },
