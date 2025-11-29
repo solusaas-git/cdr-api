@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { query } from '../db';
+import { safeQuery } from '../db';
 import { CDRQueryParams, CDRResponse, CDRRecord } from '../types';
 import { authenticateRequest } from '../middleware/auth';
 
@@ -165,9 +165,9 @@ export async function cdrRoutes(fastify: FastifyInstance) {
         console.log(`📊 Query params: limit=${limitNum}, ${useCursor ? `cursor=${cursor}` : `offset=${offsetNum}`}, account=${i_account || 'ALL'}`);
         console.log(`🔧 Query build time: ${timings.query_build_ms}ms`);
 
-        // Execute query
+        // Execute query with safeQuery (automatically queues if DB unhealthy)
         const queryStart = Date.now();
-        const rows = await query<CDRRecord>(sql, params);
+        const rows = await safeQuery<CDRRecord>(sql, params);
         timings.main_query_ms = Date.now() - queryStart;
         console.log(`⚡ Main query executed in ${timings.main_query_ms}ms - returned ${rows.length} rows`);
 
@@ -181,7 +181,7 @@ export async function cdrRoutes(fastify: FastifyInstance) {
           'SELECT COUNT(*) as count FROM'
         );
         const countParams = params.slice(0, -2); // Remove LIMIT and OFFSET
-        const countResult = await query<{ count: string }>(countSql, countParams);
+        const countResult = await safeQuery<{ count: string }>(countSql, countParams);
           total = parseInt(countResult[0]?.count || '0');
           timings.count_query_ms = Date.now() - countStart;
           console.log(`🔢 Count query executed in ${timings.count_query_ms}ms - total: ${total}`);
@@ -222,8 +222,21 @@ export async function cdrRoutes(fastify: FastifyInstance) {
         return reply.send(response);
       } catch (error) {
         console.error('❌ Error fetching CDRs:', error);
+        
+        // Check if it's a queue overload error
+        if (error instanceof Error && error.message.includes('Queue overloaded')) {
+          return reply.code(503).send({
+            success: false,
+            status: 'overloaded',
+            error: 'Replica is recovering — too many queued requests. Please try again in a moment.',
+            message: 'Database replica is under heavy load',
+            queue_overload: true,
+          });
+        }
+        
         return reply.code(500).send({
           success: false,
+          status: 'error',
           error: error instanceof Error ? error.message : 'Internal server error',
         });
       }
@@ -276,7 +289,7 @@ export async function cdrRoutes(fastify: FastifyInstance) {
           paramIndex++;
         }
 
-        const result = await query(sql, params);
+        const result = await safeQuery(sql, params);
 
         return reply.send({
           success: true,
@@ -284,8 +297,18 @@ export async function cdrRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         console.error('❌ Error fetching CDR stats:', error);
+        
+        if (error instanceof Error && error.message.includes('Queue overloaded')) {
+          return reply.code(503).send({
+            success: false,
+            status: 'overloaded',
+            error: 'Replica is recovering — too many queued requests. Please try again in a moment.',
+          });
+        }
+        
         return reply.code(500).send({
           success: false,
+          status: 'error',
           error: error instanceof Error ? error.message : 'Internal server error',
         });
       }
@@ -350,7 +373,7 @@ export async function cdrRoutes(fastify: FastifyInstance) {
 
         console.log(`📊 Fetching top destinations for account ${accountId}`);
 
-        const result = await query(sql, params);
+        const result = await safeQuery(sql, params);
 
         return reply.send({
           success: true,
@@ -359,8 +382,18 @@ export async function cdrRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         console.error('❌ Error fetching top destinations:', error);
+        
+        if (error instanceof Error && error.message.includes('Queue overloaded')) {
+          return reply.code(503).send({
+            success: false,
+            status: 'overloaded',
+            error: 'Replica is recovering — too many queued requests. Please try again in a moment.',
+          });
+        }
+        
         return reply.code(500).send({
           success: false,
+          status: 'error',
           error: error instanceof Error ? error.message : 'Internal server error',
         });
       }
@@ -372,7 +405,7 @@ export async function cdrRoutes(fastify: FastifyInstance) {
     preHandler: authenticateRequest,
   }, async (request, reply) => {
     try {
-      const result = await query(`
+      const result = await safeQuery(`
         SELECT 
           pg_last_wal_receive_lsn() AS receive_lsn,
           pg_last_wal_replay_lsn() AS replay_lsn,
@@ -394,8 +427,18 @@ export async function cdrRoutes(fastify: FastifyInstance) {
       });
     } catch (error) {
       console.error('❌ Error fetching replication status:', error);
+      
+      if (error instanceof Error && error.message.includes('Queue overloaded')) {
+        return reply.code(503).send({
+          success: false,
+          status: 'overloaded',
+          error: 'Replica is recovering — too many queued requests.',
+        });
+      }
+      
       return reply.code(500).send({
         success: false,
+        status: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
       });
     }

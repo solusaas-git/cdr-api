@@ -1,40 +1,64 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import dotenv from 'dotenv';
 import { cdrRoutes } from './routes/cdrs';
 import { consumptionRoutes } from './routes/consumption';
-import { closePool, query } from './db';
+import { closePool, query, waitForPostgres } from './db';
+import { requestQueue } from './queue';
+import { dbHealthMonitor } from './db-health';
+import { config, printConfigSummary } from './config';
 
-dotenv.config();
-
-const PORT = parseInt(process.env.API_PORT || '3001');
-const HOST = process.env.API_HOST || 'localhost';
-const IS_VERCEL = !!process.env.VERCEL;
+// Constants from config
+const { app, server, security, logging } = config;
+const { port: PORT, host: HOST } = server;
+const { version: API_VERSION, isProduction: IS_PRODUCTION, environment: NODE_ENV } = app;
 
 // Configure logger based on environment
-const loggerConfig = IS_VERCEL
-  ? { level: 'info' } // Simple logging for Vercel
-  : {
-    level: 'info',
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
-      },
+const loggerConfig = {
+  level: logging.level,
+  transport: logging.pretty ? {
+    target: 'pino-pretty',
+    options: {
+      translateTime: 'HH:MM:ss Z',
+      ignore: 'pid,hostname',
     },
-    };
+  } : undefined,
+};
 
 const fastify = Fastify({
   logger: loggerConfig,
-  requestTimeout: 600000, // 10 minutes
-  bodyLimit: 10485760, // 10MB
+  requestTimeout: server.requestTimeout,
+  bodyLimit: server.bodyLimit,
 });
 
 // Register CORS
 fastify.register(cors, {
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-  credentials: true,
+  origin: security.allowedOrigins,
+  credentials: security.corsCredentials,
+});
+
+// Global error handler
+fastify.setErrorHandler((error, request, reply) => {
+  // Log the error
+  fastify.log.error(error);
+  
+  // Determine status code
+  const statusCode = error.statusCode || 500;
+  
+  // Build error response
+  const errorResponse: any = {
+    success: false,
+    status: 'error',
+    error: error.message || 'Internal server error',
+    timestamp: new Date().toISOString(),
+  };
+  
+  // Add stack trace in development only
+  if (!IS_PRODUCTION) {
+    errorResponse.stack = error.stack;
+  }
+  
+  // Send error response
+  reply.code(statusCode).send(errorResponse);
 });
 
 // Register routes
@@ -45,9 +69,9 @@ fastify.register(consumptionRoutes);
 fastify.get('/', async (request, reply) => {
   return {
     service: 'CDR API',
-    version: '1.0.0',
+    version: API_VERSION,
     status: 'running',
-    environment: IS_VERCEL ? 'vercel' : 'local',
+    environment: NODE_ENV,
   };
 });
 
@@ -66,83 +90,134 @@ fastify.get('/health', async (request, reply) => {
     
     console.log('✅ Health check passed');
     
+    // Include queue stats and db health in health check
+    const queueStats = requestQueue.getStats();
+    const dbHealth = dbHealthMonitor.getStatus();
+    
     return {
       status: 'ok',
       database: 'connected',
       timestamp: new Date().toISOString(),
-      environment: IS_VERCEL ? 'vercel' : 'local',
+      environment: NODE_ENV,
+      version: API_VERSION,
+      queue: queueStats,
+      dbHealth: {
+        ...dbHealth,
+        summary: dbHealthMonitor.getStatusSummary(),
+      },
     };
   } catch (error) {
     console.error('❌ Health check failed:', error);
+    
+    const queueStats = requestQueue.getStats();
+    const dbHealth = dbHealthMonitor.getStatus();
     
     return reply.code(503).send({
       status: 'unhealthy',
       database: 'disconnected',
       timestamp: new Date().toISOString(),
-      environment: IS_VERCEL ? 'vercel' : 'local',
+      environment: NODE_ENV,
+      version: API_VERSION,
       error: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined,
+      // Only include stack trace in development
+      ...(IS_PRODUCTION ? {} : { stack: error instanceof Error ? error.stack : undefined }),
+      queue: queueStats,
+      dbHealth: {
+        ...dbHealth,
+        summary: dbHealthMonitor.getStatusSummary(),
+      },
     });
   }
 });
 
-// Vercel serverless handler
-export default async (req: any, res: any) => {
-  await fastify.ready();
-  fastify.server.emit('request', req, res);
-};
+// Database health status endpoint
+fastify.get('/db/health', async (request, reply) => {
+  const status = dbHealthMonitor.getStatus();
+  const summary = dbHealthMonitor.getStatusSummary();
+  
+  return {
+    success: true,
+    ...status,
+    summary,
+    timeSinceDown: dbHealthMonitor.timeSinceDown(),
+    timeSinceSuccess: dbHealthMonitor.timeSinceSuccess(),
+    timestamp: new Date().toISOString(),
+  };
+});
 
-// Local development server (only runs when not on Vercel)
-if (!IS_VERCEL) {
+// Queue stats endpoint (for monitoring)
+fastify.get('/queue/stats', async (request, reply) => {
+  const stats = requestQueue.getStats();
+  return {
+    success: true,
+    ...stats,
+    timestamp: new Date().toISOString(),
+  };
+});
+
 // Graceful shutdown
-  let isShuttingDown = false;
+let isShuttingDown = false;
 
 const gracefulShutdown = async (signal: string) => {
-    if (isShuttingDown) {
-      return; // Prevent multiple shutdown attempts
-    }
-    isShuttingDown = true;
-    
-    console.log(`\n🛑 Received ${signal}, shutting down...`);
+  if (isShuttingDown) {
+    return; // Prevent multiple shutdown attempts
+  }
+  isShuttingDown = true;
   
-    // Set a hard timeout - force exit if shutdown takes too long
-    const forceExitTimeout = setTimeout(() => {
-      console.log('⚠️  Force exiting after 1s timeout');
+  console.log(`\n🛑 Received ${signal}, shutting down...`);
+  
+  // Set a hard timeout - force exit if shutdown takes too long
+  const forceExitTimeout = setTimeout(() => {
+    console.log('⚠️  Force exiting after 1s timeout');
     process.exit(0);
-    }, 1000);
+  }, 1000);
   
   try {
-      // Close Fastify server first (stops accepting new connections)
+    // Stop health monitor
+    dbHealthMonitor.stop();
+    
+    // Close Fastify server first (stops accepting new connections)
     await Promise.race([
       fastify.close(),
-        new Promise((resolve) => setTimeout(resolve, 500))
+      new Promise((resolve) => setTimeout(resolve, 500))
     ]);
-      
-      // Close database pool
+    
+    // Close database pool
     await closePool();
-      
-      clearTimeout(forceExitTimeout);
+    
+    clearTimeout(forceExitTimeout);
     process.exit(0);
   } catch (err) {
     console.error('❌ Error during shutdown:', err);
-      clearTimeout(forceExitTimeout);
-      process.exit(0); // Exit cleanly anyway for tsx
+    clearTimeout(forceExitTimeout);
+    process.exit(0);
   }
 };
 
-  // Handle shutdown signals
+// Handle shutdown signals
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Start server
 const start = async () => {
   try {
+    // Print configuration summary
+    printConfigSummary();
+    
+    // Wait for database to be ready before starting server
+    await waitForPostgres();
+    
+    // Start database health monitoring
+    dbHealthMonitor.start();
+    
     await fastify.listen({ port: PORT, host: HOST });
     console.log(`
 🚀 CDR API Server is running!
 📡 Listening on: http://${HOST}:${PORT}
 🔗 Health check: http://${HOST}:${PORT}/health
 📊 CDR endpoint: http://${HOST}:${PORT}/cdrs
+🏥 DB Health: http://${HOST}:${PORT}/db/health
+📊 Queue stats: http://${HOST}:${PORT}/queue/stats
     `);
   } catch (err) {
     fastify.log.error(err);
@@ -151,5 +226,4 @@ const start = async () => {
 };
 
 start();
-}
 

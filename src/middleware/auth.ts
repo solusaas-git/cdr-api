@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
+import { config } from '../config';
 
-const API_SECRET = process.env.API_SECRET;
+const { apiSecret } = config.security;
 
 /**
  * Authentication middleware to validate API secret
@@ -11,7 +12,7 @@ export async function authenticateRequest(
   reply: FastifyReply
 ) {
   // Skip auth if no API_SECRET is configured (for development only)
-  if (!API_SECRET) {
+  if (!apiSecret) {
     console.warn('⚠️  WARNING: API_SECRET not configured - API is UNSECURED!');
     return;
   }
@@ -28,7 +29,7 @@ export async function authenticateRequest(
 
   const token = authHeader.replace('Bearer ', '');
 
-  if (token !== API_SECRET) {
+  if (token !== apiSecret) {
     console.error('❌ Authentication failed: Invalid API secret');
     return reply.code(401).send({
       success: false,

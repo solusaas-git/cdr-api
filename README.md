@@ -1,14 +1,32 @@
-# CDR API - High-Performance PostgreSQL Replica API
+# CDR API v2.0.0 - High-Performance PostgreSQL Replica API
 
-A high-performance API server for querying CDR (Call Detail Records) from a PostgreSQL replica database.
+A production-ready API server for querying CDR (Call Detail Records) from a PostgreSQL replica database. **VPS-hosted** with advanced protection features.
 
-## Features
+## ✨ Features
 
+### Performance & Reliability
 - ⚡ **Fast**: Built with Fastify for maximum performance
-- 🔄 **Streaming Replication**: Reads from PostgreSQL replica (no load on production)
-- 📊 **Batch Processing**: Handles large datasets efficiently
+- 🔄 **Replica-Safe**: Automatic handling of replica startup delays
+- 🛡️ **Circuit Breaker**: Netflix Hystrix-style protection
+- 📊 **Request Queue**: Automatic queuing during database issues
+- 🏥 **Health Monitoring**: Continuous database health checks
+- 🔄 **Auto Recovery**: Automatic recovery from database failures
+
+### Security & Scalability
 - 🔒 **Secure**: Bearer token authentication, CORS protection
 - 📈 **Scalable**: Connection pooling and optimized queries
+- 🎯 **Production-Ready**: Zero downtime deployments
+- 📝 **Well-Documented**: Comprehensive guides
+
+## 🏗️ Architecture
+
+```
+Client Request → Fastify API → safeQuery → Queue/Circuit Breaker → PostgreSQL Replica
+                                                ↓
+                                         Health Monitor (2s checks)
+```
+
+## 🚀 Quick Start
 
 ## Prerequisites
 

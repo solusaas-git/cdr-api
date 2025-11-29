@@ -1,5 +1,5 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { query } from '../db';
+import { safeQuery } from '../db';
 import { authenticateRequest } from '../middleware/auth';
 
 interface ConsumptionQuerystring {
@@ -83,9 +83,9 @@ export async function consumptionRoutes(fastify: FastifyInstance) {
         console.log(`📊 Fetching consumption data for account ${accountId}`);
         console.log(`📅 Date range: ${start_date || 'all'} to ${end_date || 'all'}`);
 
-        // Execute aggregation query
+        // Execute aggregation query with safeQuery
         const queryStart = Date.now();
-        const result = await query<any>(sql, params);
+        const result = await safeQuery<any>(sql, params);
         const queryTime = Date.now() - queryStart;
 
         const row = result[0];
@@ -127,8 +127,18 @@ export async function consumptionRoutes(fastify: FastifyInstance) {
         });
       } catch (error) {
         console.error('❌ Error fetching consumption data:', error);
+        
+        if (error instanceof Error && error.message.includes('Queue overloaded')) {
+          return reply.code(503).send({
+            success: false,
+            status: 'overloaded',
+            error: 'Replica is recovering — too many queued requests. Please try again in a moment.',
+          });
+        }
+        
         return reply.code(500).send({
           success: false,
+          status: 'error',
           error: error instanceof Error ? error.message : 'Internal server error',
         });
       }

@@ -1,14 +1,13 @@
 {
   "name": "cdr-api",
-  "version": "1.0.0",
-  "description": "High-performance CDR API with PostgreSQL replica",
+  "version": "2.0.0",
+  "description": "High-performance CDR API with PostgreSQL replica protection - VPS hosted",
   "main": "dist/index.js",
   "scripts": {
-    "predev": "lsof -ti:3002 | xargs kill -9 2>/dev/null || true",
+    "predev": "lsof -ti:3001 | xargs kill -9 2>/dev/null || true",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "vercel-build": "echo 'No build step needed for serverless'",
     "type-check": "tsc --noEmit",
     "create-indexes": "tsx add-cdr-indexes.ts",
     "verify-indexes": "tsx verify-indexes.ts"
@@ -16,7 +15,11 @@
   "keywords": [
     "cdr",
     "api",
-    "postgresql"
+    "postgresql",
+    "circuit-breaker",
+    "queue",
+    "health-monitor",
+    "vps"
   ],
   "author": "",
   "license": "ISC",

@@ -17,6 +17,8 @@ module.exports = {
       watch: false,
       max_restarts: 10,
       min_uptime: '10s',
+      restart_delay: 5000, // Wait 5 seconds between restart attempts
+      exp_backoff_restart_delay: 100, // Exponential backoff (doubles each time)
     },
   ],
 };
