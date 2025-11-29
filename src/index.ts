@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { cdrRoutes } from './routes/cdrs';
 import { consumptionRoutes } from './routes/consumption';
+import { monitoringRoutes } from './routes/monitoring';
 import { closePool, query, waitForPostgres } from './db';
 import { requestQueue } from './queue';
 import { dbHealthMonitor } from './db-health';
@@ -64,6 +65,7 @@ fastify.setErrorHandler((error, request, reply) => {
 // Register routes
 fastify.register(cdrRoutes);
 fastify.register(consumptionRoutes);
+fastify.register(monitoringRoutes);
 
 // Root endpoint
 fastify.get('/', async (request, reply) => {
@@ -128,31 +130,6 @@ fastify.get('/health', async (request, reply) => {
       },
     });
   }
-});
-
-// Database health status endpoint
-fastify.get('/db/health', async (request, reply) => {
-  const status = dbHealthMonitor.getStatus();
-  const summary = dbHealthMonitor.getStatusSummary();
-  
-  return {
-    success: true,
-    ...status,
-    summary,
-    timeSinceDown: dbHealthMonitor.timeSinceDown(),
-    timeSinceSuccess: dbHealthMonitor.timeSinceSuccess(),
-    timestamp: new Date().toISOString(),
-  };
-});
-
-// Queue stats endpoint (for monitoring)
-fastify.get('/queue/stats', async (request, reply) => {
-  const stats = requestQueue.getStats();
-  return {
-    success: true,
-    ...stats,
-    timestamp: new Date().toISOString(),
-  };
 });
 
 // Graceful shutdown
