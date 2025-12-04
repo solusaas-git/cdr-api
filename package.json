@@ -25,7 +25,9 @@
   "license": "ISC",
   "dependencies": {
     "@fastify/cors": "^9.0.1",
+    "body-parser": "^2.2.1",
     "dotenv": "^16.4.5",
+    "express": "^5.2.1",
     "fastify": "^4.26.2",
     "pg": "^8.11.3",
     "pino-pretty": "^13.1.2"
@@ -35,5 +37,16 @@
     "@types/pg": "^8.11.4",
     "tsx": "^4.7.1",
     "typescript": "^5.4.3"
-  }
+  },
+  "directories": {
+    "doc": "docs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/solusaas-git/cdr-api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/solusaas-git/cdr-api/issues"
+  },
+  "homepage": "https://github.com/solusaas-git/cdr-api#readme"
 }
