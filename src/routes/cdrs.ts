@@ -56,6 +56,7 @@ export async function cdrRoutes(fastify: FastifyInstance) {
           SELECT 
             cdrs.i_cdr,
             cdrs.i_call,
+            cdrs.i_account,
             cdrs.cli_in as cli,
             cdrs.cld_in as cld,
             cdrs.connect_time,
