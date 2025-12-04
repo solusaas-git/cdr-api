@@ -60,6 +60,7 @@ export async function cdrRoutes(fastify: FastifyInstance) {
             cdrs.cli_in as cli,
             cdrs.cld_in as cld,
             cdrs.connect_time,
+            cdrs.disconnect_time,
             cdrs.duration,
             cdrs.billed_duration,
             cdrs.cost,
